@@ -21,3 +21,19 @@ class User:
         if re.match(r"^\+?[1-9][0-9]{7,14}$", phone):
             return True
         return False
+
+
+class Expressions:
+
+    def __init__(self, id, operation, *values):
+        self.id = id
+        self.operation = operation
+        self.values = values
+        self.answer = self.__evaluate()
+
+    def __evaluate(self):
+        return eval(self.to_string())
+
+    def to_string(self):
+        expr_str = "".join([(str(self.values[i]) + ' ' + self.operation + ' ') for i in range(len(self.values))])[:-3]
+        return expr_str
