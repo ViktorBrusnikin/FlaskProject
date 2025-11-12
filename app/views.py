@@ -1,8 +1,10 @@
-from app import app, USERS, models, EXPRESSIONS
+from app import app, USERS, models, EXPRESSIONS, QUESTIONS
 from flask import request, Response
 import json
 from http import HTTPStatus
 import random
+
+from app.models import User, Expression
 
 
 @app.route("/")
@@ -46,7 +48,7 @@ def user_create():
 
 @app.get("/user/<int:user_id>")
 def get_user(user_id):
-    if len(USERS) <= user_id or user_id < 0:
+    if not User.is_valid_id(user_id):
         return Response(status=HTTPStatus.NOT_FOUND)
 
     response = Response(
@@ -73,7 +75,7 @@ def generate_expr():
     expr_id = len(EXPRESSIONS)
     count_nums = data["count_nums"]
     operation = data["operation"]
-    if operation == 'random':
+    if operation == "random":
         operation = random.choice(["+", "*", "-", "//", "**"])
     min_num = data["min"]
     max_num = data["max"]
@@ -82,7 +84,7 @@ def generate_expr():
         return Response(status=HTTPStatus.BAD_REQUEST)
 
     values = [random.randint(min_num, max_num) for _ in range(count_nums)]
-    expression = models.Expressions(expr_id, operation, *values)
+    expression = models.Expression(expr_id, operation, *values)
 
     EXPRESSIONS.append(expression)
 
@@ -101,9 +103,10 @@ def generate_expr():
 
     return response
 
+
 @app.get("/math/<int:expr_id>")
 def get_expr(expr_id):
-    if expr_id > len(EXPRESSIONS) or expr_id < 0:
+    if not Expression.is_valid_id(expr_id):
         return Response(status=HTTPStatus.BAD_REQUEST)
 
     expression = EXPRESSIONS[expr_id]
@@ -122,3 +125,84 @@ def get_expr(expr_id):
     )
 
     return response
+
+
+@app.post("/math/<int:expression_id>/solve")
+def expression_solve(expression_id):
+    if not Expression.is_valid_id(expression_id):
+        return Response(status=HTTPStatus.BAD_REQUEST)
+
+    data = request.get_json()
+
+    user_id = data["user_id"]
+
+    if not User.is_valid_id(user_id):
+        return Response(status=HTTPStatus.BAD_REQUEST)
+
+    user = USERS[user_id]
+
+    user_answer = data["user_answer"]
+
+    expression = EXPRESSIONS[expression_id]
+
+    if user_answer == expression.answer:
+        user.increase_score(expression.reward)
+        return Response(
+            json.dumps(
+                {
+                    "expression_id": expression_id,
+                    "result": "correct",
+                    "reward": expression.reward,
+                }
+            ),
+            status=HTTPStatus.OK,
+            mimetype="application/json",
+        )
+
+    user.increase_score(-1)
+
+    return Response(
+        json.dumps(
+            {"expression_id": expression_id, "result": "incorrect", "reward": -1}
+        ),
+        status=HTTPStatus.OK,
+        mimetype="application/json",
+    )
+
+
+@app.post("/questions/create")
+def create_question():
+    data = request.get_json()
+    title = data["title"]
+    description = data["description"]
+    question_type = data["type"]
+    question_id = len(QUESTIONS)
+    question = None
+    if question_type == "ONE-ANSWER":
+        answer = data["answer"]
+        if not models.OneAnswer.is_valid(answer):
+            return Response(status=HTTPStatus.BAD_REQUEST)
+        question = models.OneAnswer(question_id, title, description, answer, reward=1)
+    elif question_type == "MULTIPLE-CHOICE":
+        choices = data["choices"]
+        answer = data["answer"]
+        if not models.MultipleChoice.is_valid(answer, choices):
+            return Response(status=HTTPStatus.BAD_REQUEST)
+        question = models.MultipleChoice(
+            question_id, title, description, answer, choices, reward=1
+        )
+
+    QUESTIONS.append(question)
+
+    return Response(
+        json.dumps(
+            {
+                "id": question.id,
+                "title": question.title,
+                "description": question.description,
+                "type": question_type,
+                "answer": question.answer,
+            }
+        ),
+        status=HTTPStatus.OK,
+    )
