@@ -4,6 +4,7 @@ from app import USERS, EXPRESSIONS
 
 from abc import ABC, abstractmethod
 
+
 class User:
 
     def __init__(self, id, first_name, last_name, phone, email, score=0):
@@ -13,6 +14,7 @@ class User:
         self.phone = phone
         self.email = email
         self.score = score
+        self.history = list()
 
     @staticmethod
     def is_valid_email(email):
@@ -32,6 +34,17 @@ class User:
 
     def increase_score(self, amount=1):
         self.score += amount
+
+    def repr(self):
+        return f"{self.id}) {self.first_name} {self.last_name}"
+
+    def solve(self, task, user_answer):
+        if not isinstance(task, Question) and not isinstance(task, Expression):
+            return
+        result = task.to_dict()
+        result["user_answer"] = user_answer
+        result['reward'] = task.reward if user_answer == task.answer else 0
+        self.history.append(result)
 
 
 class Expression:
@@ -56,6 +69,19 @@ class Expression:
         expr_str = "".join([(str(self.values[i]) + ' ' + self.operation + ' ') for i in range(len(self.values))])[:-3]
         return expr_str
 
+    def repr(self):
+        return f"{self.id}) {self.to_string()} = {self.answer}"
+
+    def to_dict(self):
+        return dict(
+            {
+                "id": self.id,
+                "operation": self.operation,
+                "values": self.values,
+                "string_expression": self.to_string()
+            }
+        )
+
 
 class Question(ABC):
 
@@ -71,6 +97,10 @@ class Question(ABC):
     @abstractmethod
     def answer(self):
         pass
+
+    def repr(self):
+        return f"{self.id}) {self.title}"
+
 
 class OneAnswer(Question):
 
@@ -92,6 +122,17 @@ class OneAnswer(Question):
     @staticmethod
     def is_valid(answer):
         return isinstance(answer, str)
+
+    def to_dict(self):
+        return dict(
+            {
+                "title": self.title,
+                "description": self.description,
+                "type": "ONE-ANSWER",
+                "answer": self.answer,
+            }
+        )
+
 
 class MultipleChoice(Question):
 
@@ -117,3 +158,14 @@ class MultipleChoice(Question):
         if not isinstance(answer, int) or not isinstance(choices, list):
             return False
         return answer >= 0 and answer < len(choices)
+
+    def to_dict(self):
+        return dict(
+            {
+                "title": self.title,
+                "description": self.description,
+                "type": "MULTIPLE-CHOICE",
+                "answer": self.answer,
+                "choices": self.choices,
+            }
+        )
