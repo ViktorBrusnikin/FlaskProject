@@ -46,6 +46,19 @@ class User:
         result['reward'] = task.reward if user_answer == task.answer else 0
         self.history.append(result)
 
+    def __lt__(self, other):
+        return self.score < other.score
+
+    def to_dict(self):
+        return dict(
+            {
+                "id": self.id,
+                "first_name": self.first_name,
+                "last_name": self.last_name,
+                "score": self.score
+            }
+        )
+
 
 class Expression:
 
